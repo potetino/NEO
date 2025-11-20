@@ -1,0 +1,419 @@
+;=============================================================
+; ГЛАВНЫЙ ИГРОВОЙ ЦИКЛ
+;=============================================================
+GAMELP: 
+        ; СОХРАНЯЕМ РЕГИСТРЫ
+        MOV     R0, -(SP)
+        MOV     R1, -(SP)
+        MOV     R2, -(SP)
+        MOV     R3, -(SP)
+
+        ; 1. ОБРАБОТКА ВВОДА И ДВИЖЕНИЯ ГЕРОЯ
+        CALL    HANDLEINPUT     ; ОБРАБОТКА КЛАВИАТУРЫ
+        CALL    UPDATEHERO      ; ОБНОВЛЕНИЕ ПОЗИЦИИ ГЕРОЯ
+
+        ; 2. ОБНОВЛЕНИЕ ВРАГОВ
+        CALL    UPDATEENEMIES
+
+        ; 3. ОБНОВЛЕНИЕ ПУЛЬ
+        CALL    UPDATEBULLETS
+
+        ; 4. ОБНОВЛЕНИЕ БОНУСОВ
+        CALL    UPDATEBONUSES
+
+        ; 5. ПРОВЕРКА КОЛЛИЗИЙ ДЛЯ ГЕРОЯ
+        MOV     #BOMEN, R0      ; ГЛАВНЫЙ ГЕРОЙ
+        CALL    CHERCO
+
+        ; 6. ПРОВЕРКА КОЛЛИЗИЙ ДЛЯ ВРАГОВ
+        CALL    CENECO
+
+        ; 7. ПРОВЕРКА КОЛЛИЗИЙ ДЛЯ ПУЛЬ
+        CALL    CBULCO
+
+        ; 8. ОТРИСОВКА
+        CALL    DRAWSCENE
+
+        ; 9. ЗАДЕРЖКА ДЛЯ СТАБИЛЬНОСТИ FPS
+        MOV     #50000, R4
+        CALL    DEL
+
+        ; ВОССТАНАВЛИВАЕМ РЕГИСТРЫ
+        MOV     (SP)+, R3
+        MOV     (SP)+, R2
+        MOV     (SP)+, R1
+        MOV     (SP)+, R0
+
+        ; ПРОВЕРКА УСЛОВИЯ ВЫХОДА ИЗ ИГРЫ
+        TST     GAMEOVER
+        BEQ     GAMELP
+
+        BR GAMELP
+;======================================================
+; ОБРАБОТКА КОЛЛИЗИЙ ДЛЯ ГЕРОЯ
+;======================================================
+CHERCO:
+        MOV     R0, -(SP)
+        MOV     R1, -(SP)
+        MOV     R2, -(SP)
+
+        ; А. ПРОВЕРКА С ОБЪЕКТАМИ
+        MOV     #BOMEN, R0
+        CALL    COLANY          ; ПРОВЕРЯЕМ КОЛЛИЗИИ С ЛЮБЫМИ ОБЪЕКТАМИ
+        TST     R0
+        BEQ     3$   ; НЕТ КОЛЛИЗИЙ С ОБЪЕКТАМИ
+
+        ; ОБРАБОТКА КОЛЛИЗИИ В ЗАВИСИМОСТИ ОТ ТИПА
+        CMP     R1, #TYPENM     ; ТИП = ВРАГ?
+        BNE     1$
+
+        ; СТОЛКНОВЕНИЕ С ВРАГОМ - ГЕРОЙ ПОЛУЧАЕТ УРОН
+        CALL    HURTHERO
+        MOV     R0, R2          ; СОХРАНЯЕМ АДРЕС ВРАГА
+        CALL    HURTENEMY       ; ВРАГ ТОЖЕ ПОЛУЧАЕТ УРОН
+        BR      3$
+
+1$:
+        CMP     R1, #TYPBNS     ; ТИП = БОНУС?
+        BNE     2$
+
+        ; ПОДБОР БОНУСА
+        CALL    TAKBNUS
+        MOV     R0, R1          ; АДРЕС БОНУСА
+        CALL    REMOBJ          ; УДАЛЯЕМ БОНУС ИЗ ИГРЫ
+        BR      3$
+
+2$:
+        CMP     R1, #TYPBUL     ; ТИП = ПУЛЯ?
+        BNE     3$
+
+        ; ПОПАДАНИЕ ПУЛИ В ГЕРОЯ
+        CALL    HURTHERO
+        MOV     R0, R1          ; АДРЕС ПУЛИ
+        CALL    REMOBJ          ; УДАЛЯЕМ ПУЛЮ
+
+3$:
+        ; Б. ПРОВЕРКА С ГРАНИЦАМИ ЭКРАНА
+        MOV     #BOMEN, R0
+        CALL    COLENV
+        TST     R0
+        BEQ     4$
+
+        ; ОБРАБОТКА КОЛЛИЗИЙ С ГРАНИЦАМИ
+        CALL    HLDGCO
+
+4$:
+        MOV     (SP)+, R2
+        MOV     (SP)+, R1
+        MOV     (SP)+, R0
+        
+        RETURN
+;===========================================================
+; ОБРАБОТКА КОЛЛИЗИЙ ДЛЯ ВРАГОВ
+;===========================================================
+CENECO:
+        MOV     R0, -(SP)
+        MOV     R1, -(SP)
+        MOV     R2, -(SP)
+        MOV     R3, -(SP)
+
+        ; ПРОХОДИМ ПО ВСЕМ ВРАГАМ В СПИСКЕ ОБЪЕКТОВ
+        MOV     OBJCNT, R3
+        BEQ     ENEMY_COL_EXIT  ; ЕСЛИ ОБЪЕКТОВ НЕТ - ВЫХОД
+
+        MOV     #OBJLST, R2     ; УКАЗАТЕЛЬ НА СПИСОК
+
+1$:
+        MOV     (R2)+, R0       ; БЕРЕМ ОБЪЕКТ ИЗ СПИСКА
+        MOV     TYPE(R0), R1    ; ПРОВЕРЯЕМ ТИП
+        CMP     R1, #TYPENM     ; ЭТО ВРАГ?
+        BNE     2$
+
+        ; ПРОВЕРЯЕМ КОЛЛИЗИИ ДЛЯ ЭТОГО ВРАГА
+        CALL    CHSECO
+
+2$:
+        SOB     R3, 1$
+
+3$:
+        MOV     (SP)+, R3
+        MOV     (SP)+, R2
+        MOV     (SP)+, R1
+        MOV     (SP)+, R0
+        RETURN
+
+;=====================================================
+; ПРОВЕРКА КОЛЛИЗИЙ ДЛЯ ОДНОГО ВРАГА
+;=====================================================
+CHSECO:
+        MOV     R0, -(SP)
+        MOV     R1, -(SP)
+
+        ; ПРОВЕРКА С ДРУГИМИ ОБЪЕКТАМИ
+        CALL    COLANY
+        TST     R0
+        BEQ     ENEMY_NOCOL
+
+        ; ОБРАБОТКА КОЛЛИЗИИ ВРАГА
+        CMP     R1, #TYPBUL     ; СТОЛКНОВЕНИЕ С ПУЛЕЙ?
+        BNE     ENEMY_NOTBULLET
+
+        ; ВРАГ ПОЛУЧАЕТ УРОН ОТ ПУЛИ
+        MOV     R0, R1          ; АДРЕС ПУЛИ
+        CALL    REMOBJ          ; УДАЛЯЕМ ПУЛЮ
+        MOV     (SP), R0        ; ВОССТАНАВЛИВАЕМ АДРЕС ВРАГА
+        CALL    HURTENEMY       ; НАНЕСТИ УРОН ВРАГУ
+        BR      ENEMY_NOCOL
+
+ENEMY_NOTBULLET:
+        CMP     R1, #TYPPLR     ; СТОЛКНОВЕНИЕ С ИГРОКОМ?
+        BNE     ENEMY_NOCOL
+
+        ; ВРАГ АТАКУЕТ ИГРОКА (УЖЕ ОБРАБОТАНО В CHERCO)
+        ; ЗДЕСЬ МОЖНО ДОБАВИТЬ ДОПОЛНИТЕЛЬНУЮ ЛОГИКУ
+
+ENEMY_NOCOL:
+        ; ПРОВЕРКА С ГРАНИЦАМИ ДЛЯ ВРАГА
+        MOV     (SP), R0        ; ВОССТАНАВЛИВАЕМ АДРЕС ВРАГА
+        CALL    COLENV
+        TST     R0
+        BEQ     ENEMY_NOEDGE
+
+        ; ИЗМЕНЕНИЕ НАПРАВЛЕНИЯ ДВИЖЕНИЯ ВРАГА ПРИ СТОЛКНОВЕНИИ С ГРАНИЦЕЙ
+        MOV     (SP), R0        ; АДРЕС ВРАГА
+        CALL    CHANGEENEMYDIRECTION
+
+ENEMY_NOEDGE:
+        MOV     (SP)+, R1
+        MOV     (SP)+, R0
+        RTS     PC
+
+; ОБРАБОТКА КОЛЛИЗИЙ ДЛЯ ПУЛЬ
+CBULCO:
+        MOV     R0, -(SP)
+        MOV     R1, -(SP)
+        MOV     R2, -(SP)
+        MOV     R3, -(SP)
+
+        MOV     OBJCNT, R3
+        BEQ     BULLET_COL_EXIT
+
+        MOV     #OBJLST, R2
+
+BULLET_COL_LOOP:
+        MOV     (R2)+, R0
+        MOV     TYPE(R0), R1
+        CMP     R1, #TYPBUL     ; ЭТО ПУЛЯ?
+        BNE     BULLET_COL_NEXT
+
+        ; ПРОВЕРЯЕМ КОЛЛИЗИИ ДЛЯ ПУЛИ
+        CALL    CHECK_SINGLE_BULLET_COL
+
+BULLET_COL_NEXT:
+        SOB     R3, BULLET_COL_LOOP
+
+BULLET_COL_EXIT:
+        MOV     (SP)+, R3
+        MOV     (SP)+, R2
+        MOV     (SP)+, R1
+        MOV     (SP)+, R0
+        RTS     PC
+
+; ПРОВЕРКА КОЛЛИЗИЙ ДЛЯ ОДНОЙ ПУЛИ
+CHECK_SINGLE_BULLET_COL:
+        MOV     R0, -(SP)
+        MOV     R1, -(SP)
+
+        ; ПРОВЕРКА С ДРУГИМИ ОБЪЕКТАМИ
+        CALL    COLANY
+        TST     R0
+        BEQ     BULLET_NOCOL
+
+        ; ПУЛЯ СТОЛКНУЛАСЬ С ЧЕМ-ТО
+        MOV     (SP), R1        ; АДРЕС ПУЛИ
+        CALL    REMOBJ          ; УДАЛЯЕМ ПУЛЮ
+
+        ; ПРОВЕРЯЕМ, С КЕМ СТОЛКНУЛАСЬ ПУЛЯ
+        CMP     R1, #TYPENM     ; С ВРАГОМ?
+        BEQ     BULLET_HIT_ENEMY
+        CMP     R1, #TYPWAL     ; СО СТЕНОЙ?
+        BEQ     BULLET_HIT_WALL
+        ; ДРУГИЕ ТИПЫ...
+
+        BR      BULLET_NOCOL
+
+BULLET_HIT_ENEMY:
+        ; УРОН ВРАГУ УЖЕ НАНЕСЕН В CENECO
+        BR      BULLET_NOCOL
+
+BULLET_HIT_WALL:
+        ; МОЖНО ДОБАВИТЬ ЭФФЕКТ РИКОШЕТА ИЛИ ВЗРЫВА
+        CALL    CREATEEXPLOSION
+        BR      BULLET_NOCOL
+
+BULLET_NOCOL:
+        ; ПРОВЕРКА ВЫЛЕТА ЗА ГРАНИЦЫ ЭКРАНА
+        MOV     (SP), R0
+        CALL    COLENV
+        TST     R0
+        BEQ     BULLET_NOEDGE
+
+        ; ПУЛЯ ВЫЛЕТЕЛА ЗА ГРАНИЦЫ - УДАЛЯЕМ
+        MOV     (SP), R1
+        CALL    REMOBJ
+
+BULLET_NOEDGE:
+        MOV     (SP)+, R1
+        MOV     (SP)+, R0
+        RTS     PC
+
+; ОБРАБОТКА КОЛЛИЗИЙ С ГРАНИЦАМИ ЭКРАНА
+HLDGCO:
+        MOV     R1, -(SP)
+        MOV     R2, -(SP)
+        MOV     R3, -(SP)
+
+        MOV     R0, R1          ; СОХРАНЯЕМ ФЛАГИ
+        MOV     #BOMEN, R0
+
+        BIT     #1, R1          ; КОЛЛИЗИЯ СЛЕВА?
+        BEQ     HEC_CHKRIGHT
+        MOV     #0, DXS(R0)     ; ОСТАНАВЛИВАЕМ ДВИЖЕНИЕ ВЛЕВО
+        MOV     #10., POSX(R0)  ; ВЫТАЛКИВАЕМ ОТ ГРАНИЦЫ
+
+HEC_CHKRIGHT:
+        BIT     #2, R1          ; КОЛЛИЗИЯ СПРАВА?
+        BEQ     HEC_CHKTOP
+        MOV     #0, DXS(R0)     ; ОСТАНАВЛИВАЕМ ДВИЖЕНИЕ ВПРАВО
+        MOV     #300., R2
+        MOV     ADSPR(R0), R3
+        SUB     SIZEX(R3), R2
+        MOV     R2, POSX(R0)    ; ВЫТАЛКИВАЕМ
+
+HEC_CHKTOP:
+        BIT     #4, R1          ; КОЛЛИЗИЯ СВЕРХУ?
+        BEQ     HEC_CHKBOTTOM
+        MOV     #0, DYS(R0)     ; ОСТАНАВЛИВАЕМ ДВИЖЕНИЕ ВВЕРХ
+        MOV     #10., POSY(R0)  ; ВЫТАЛКИВАЕМ
+
+HEC_CHKBOTTOM:
+        BIT     #8, R1          ; КОЛЛИЗИЯ СНИЗУ?
+        BEQ     HEC_EXIT
+        MOV     #0, DYS(R0)     ; ОСТАНАВЛИВАЕМ ДВИЖЕНИЕ ВНИЗ
+        MOV     #230., R2
+        MOV     ADSPR(R0), R3
+        SUB     SIZEY(R3), R2
+        MOV     R2, POSY(R0)    ; ВЫТАЛКИВАЕМ
+
+HEC_EXIT:
+        MOV     (SP)+, R3
+        MOV     (SP)+, R2
+        MOV     (SP)+, R1
+        RTS     PC
+
+; ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+
+; ОБРАБОТКА УРОНА ГЕРОЮ
+HURTHERO:
+        MOV     R0, -(SP)
+        MOV     R1, -(SP)
+
+        DEC     HEROHP          ; УМЕНЬШАЕМ ЗДОРОВЬЕ
+        TST     HEROHP
+        BGT     HURTHERO_NOGAMEOVER
+
+        ; ГЕРОЙ УМЕР
+        MOV     #1, GAMEOVER
+        CALL    GAMEOVERSCREEN
+
+HURTHERO_NOGAMEOVER:
+        ; ЭФФЕКТ МИГАНИЯ ИЛИ ДРУГАЯ АНИМАЦИЯ
+        CALL    HURTEFFECT
+
+        MOV     (SP)+, R1
+        MOV     (SP)+, R0
+        RTS     PC
+
+; УРОН ВРАГУ
+HURTENEMY:
+        MOV     R0, -(SP)
+        MOV     R1, -(SP)
+
+        DEC     ENEMYHP(R0)     ; УМЕНЬШАЕМ ЗДОРОВЬЕ ВРАГА
+        TST     ENEMYHP(R0)
+        BGT     HURTENEMY_NOEXPLODE
+
+        ; ВРАГ УНИЧТОЖЕН
+        CALL    CREATEEXPLOSION
+        CALL    REMOBJ          ; УДАЛЯЕМ ВРАГА ИЗ ИГРЫ
+        CALL    ADDPOINTS       ; ДОБАВЛЯЕМ ОЧКИ
+
+HURTENEMY_NOEXPLODE:
+        MOV     (SP)+, R1
+        MOV     (SP)+, R0
+        RTS     PC
+
+; ПОДБОР БОНУСА
+TAKBNUS:
+        MOV     R0, -(SP)
+        MOV     R1, -(SP)
+
+        ; ПРОВЕРЯЕМ ТИП БОНУСА
+        MOV     BONUSTYPE(R0), R1
+        CMP     R1, #BONUS_HEALTH
+        BNE     TAKBNUS_NOTHEALTH
+
+        ; БОНУС ЗДОРОВЬЯ
+        INC     HEROHP
+        CALL    HEALTHSOUND
+        BR      TAKBNUS_EXIT
+
+TAKBNUS_NOTHEALTH:
+        CMP     R1, #BONUS_POINTS
+        BNE     TAKBNUS_NOTPOINTS
+
+        ; БОНУС ОЧКОВ
+        ADD     #100, SCORE
+        CALL    POINTSOUND
+        BR      TAKBNUS_EXIT
+
+TAKBNUS_NOTPOINTS:
+        CMP     R1, #BONUS_WEAPON
+        BNE     TAKBNUS_EXIT
+
+        ; УЛУЧШЕНИЕ ОРУЖИЯ
+        INC     WEAPONLEVEL
+        CALL    WEAPONSOUND
+
+TAKBNUS_EXIT:
+        MOV     (SP)+, R1
+        MOV     (SP)+, R0
+        RTS     PC
+
+; ИЗМЕНЕНИЕ НАПРАВЛЕНИЯ ВРАГА
+CHANGEENEMYDIRECTION:
+        MOV     R1, -(SP)
+
+        ; ИНВЕРТИРУЕМ НАПРАВЛЕНИЕ ДВИЖЕНИЯ
+        NEG     DXS(R0)
+        NEG     DYS(R0)
+
+        ; МОЖНО ДОБАВИТЬ СЛУЧАЙНОЕ ИЗМЕНЕНИЕ
+        CALL    RANDOM
+        BIC     #177770, R1     ; ОСТАВЛЯЕМ 3 МЛАДШИХ БИТА
+        SUB     #4, R1          ; ОТ -4 ДО +3
+        ADD     R1, DXS(R0)
+
+        MOV     (SP)+, R1
+        RTS     PC
+
+; ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+GAMEOVER: .WORD 0
+HEROHP:   .WORD 3
+SCORE:    .WORD 0
+WEAPONLEVEL: .WORD 1
+
+; КОНСТАНТЫ ТИПОВ БОНУСОВ
+BONUS_HEALTH = 1
+BONUS_POINTS = 2
+BONUS_WEAPON = 3
