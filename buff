@@ -268,24 +268,24 @@ COLTYP:: MOV     R2, -(SP)
         CMP     R3, #TYPENM     ; OBJ2 = ВРАГ?
         BNE     2$
         MOV     #TYPENM, R0     ; РЕЗУЛЬТАТ: ВРАГ
-        BR      COLTEX
+        BR      11$
 
 1$:     CMP     R3, #TYPPLR     ; OBJ2 = ИГРОК?
         BNE     4$
         CMP     R2, #TYPENM     ; OBJ1 = ВРАГ?
         BNE     4$
         MOV     #TYPENM, R0     ; РЕЗУЛЬТАТ: ВРАГ
-        BR      COLTEX
+        BR      11$
 
 2$:     CMP     R3, #TYPBNS     ; OBJ2 = БОНУС?
         BNE     3$
         MOV     #TYPBNS, R0     ; РЕЗУЛЬТАТ: БОНУС
-        BR      COLTEX
+        BR      11$
 
 3$:     CMP     R3, #TYPWAL     ; OBJ2 = СТЕНА?
         BNE     4$
         MOV     #TYPWAL, R0     ; РЕЗУЛЬТАТ: ПРЕПЯТСТВИЕ
-        BR      COLTEX
+        BR      11$
 
 4$:     ; ПУЛЯ + ВРАГ = ПУЛЯ (УНИЧТОЖЕНИЕ)
         CMP     R2, #TYPBUL     ; OBJ1 = ПУЛЯ?
@@ -293,25 +293,25 @@ COLTYP:: MOV     R2, -(SP)
         CMP     R3, #TYPENM     ; OBJ2 = ВРАГ?
         BNE     6$
         MOV     #TYPBUL, R0     ; РЕЗУЛЬТАТ: ПУЛЯ
-        BR      COLTEX
+        BR      11$
 
 5$:     CMP     R3, #TYPBUL     ; OBJ2 = ПУЛЯ?
         BNE     OTHER
         CMP     R2, #TYPENM     ; OBJ1 = ВРАГ?
         BNE     6$
         MOV     #TYPBUL, R0     ; РЕЗУЛЬТАТ: ПУЛЯ
-        BR      COLTEX
+        BR      11$
 
 6$:     CMP     R2, #TYPBUL     ; OBJ1 = ПУЛЯ?
         BNE     OTHER
         CMP     R3, #TYPWAL     ; OBJ2 = СТЕНА?
         BNE     OTHER
         MOV     #TYPWAL, R0     ; РЕЗУЛЬТАТ: ПРЕПЯТСТВИЕ
-        BR      COLTEX
+        BR      11$
 
 OTHER:  ; ДРУГИЕ КОМБИНАЦИИ
         MOV     #0, R0          ; НЕИЗВЕСТНАЯ КОМБИНАЦИЯ
-        BR      COLTEX
+        BR      11$
 
 10$:    MOV     #0, R0          ; НЕТ КОЛЛИЗИИ
 
