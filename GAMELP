@@ -78,7 +78,7 @@ CHERCO:
         BNE     2$
 
         ; ПОДБОР БОНУСА
-        CALL    TAKBNUS
+        CALL    TAKBNS
         MOV     R0, R1          ; АДРЕС БОНУСА
         CALL    REMOBJ          ; УДАЛЯЕМ БОНУС ИЗ ИГРЫ
         BR      3$
@@ -324,77 +324,80 @@ HURTHERO:
 
         DEC     HEROHP          ; УМЕНЬШАЕМ ЗДОРОВЬЕ
         TST     HEROHP
-        BGT     HURTHERO_NOGAMEOVER
+        BGT     1$
 
         ; ГЕРОЙ УМЕР
         MOV     #1, GAMEOVER
         CALL    GAMEOVERSCREEN
 
-HURTHERO_NOGAMEOVER:
+1$:
         ; ЭФФЕКТ МИГАНИЯ ИЛИ ДРУГАЯ АНИМАЦИЯ
         CALL    HURTEFFECT
 
         MOV     (SP)+, R1
         MOV     (SP)+, R0
-        RTS     PC
-
+        RETURN
+;===========================================================
 ; УРОН ВРАГУ
+;===========================================================
 HURTENEMY:
         MOV     R0, -(SP)
         MOV     R1, -(SP)
 
         DEC     ENEMYHP(R0)     ; УМЕНЬШАЕМ ЗДОРОВЬЕ ВРАГА
         TST     ENEMYHP(R0)
-        BGT     HURTENEMY_NOEXPLODE
+        BGT     1$
 
         ; ВРАГ УНИЧТОЖЕН
         CALL    CREATEEXPLOSION
         CALL    REMOBJ          ; УДАЛЯЕМ ВРАГА ИЗ ИГРЫ
         CALL    ADDPOINTS       ; ДОБАВЛЯЕМ ОЧКИ
 
-HURTENEMY_NOEXPLODE:
+1$:
         MOV     (SP)+, R1
         MOV     (SP)+, R0
-        RTS     PC
-
+        RETURN
+;==================================================================
 ; ПОДБОР БОНУСА
-TAKBNUS:
+;==================================================================
+TAKBNS:
         MOV     R0, -(SP)
         MOV     R1, -(SP)
 
         ; ПРОВЕРЯЕМ ТИП БОНУСА
         MOV     BONUSTYPE(R0), R1
         CMP     R1, #BONUS_HEALTH
-        BNE     TAKBNUS_NOTHEALTH
+        BNE     1$
 
         ; БОНУС ЗДОРОВЬЯ
         INC     HEROHP
         CALL    HEALTHSOUND
-        BR      TAKBNUS_EXIT
+        BR      3$
 
-TAKBNUS_NOTHEALTH:
+1$:
         CMP     R1, #BONUS_POINTS
-        BNE     TAKBNUS_NOTPOINTS
+        BNE     2$
 
         ; БОНУС ОЧКОВ
         ADD     #100, SCORE
         CALL    POINTSOUND
-        BR      TAKBNUS_EXIT
+        BR      3$
 
-TAKBNUS_NOTPOINTS:
+2$:
         CMP     R1, #BONUS_WEAPON
-        BNE     TAKBNUS_EXIT
+        BNE     3$
 
         ; УЛУЧШЕНИЕ ОРУЖИЯ
         INC     WEAPONLEVEL
         CALL    WEAPONSOUND
 
-TAKBNUS_EXIT:
+3$:
         MOV     (SP)+, R1
         MOV     (SP)+, R0
-        RTS     PC
-
+        RETURN
+;=============================================================
 ; ИЗМЕНЕНИЕ НАПРАВЛЕНИЯ ВРАГА
+;=============================================================
 CHENMD:
         MOV     R1, -(SP)
 
@@ -409,7 +412,7 @@ CHENMD:
         ADD     R1, DXS(R0)
 
         MOV     (SP)+, R1
-        RTS     PC
+        RETURN
 ;===================================================================
 ; ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
 ;===================================================================
