@@ -242,7 +242,7 @@ COLTYP: MOV     R2, -(SP)
         
         CALL    COLCHE          ; СНАЧАЛА ПРОВЕРЯЕМ БАЗОВУЮ КОЛЛИЗИЮ
         TST     R0
-        BEQ     COLTNO          ; НЕТ КОЛЛИЗИИ
+        BEQ     10$          ; НЕТ КОЛЛИЗИИ
         
         ; СОХРАНЯЕМ АДРЕСА ОБЪЕКТОВ
         MOV     R0, R2          ; R2 = АДРЕС OBJ1
@@ -259,45 +259,45 @@ COLTYP: MOV     R2, -(SP)
         
         ; ИГРОК + ВРАГ = ВРАГ (УРОН)
         CMP     R2, #TYPPLR     ; OBJ1 = ИГРОК?
-        BNE     CHKPLR2
+        BNE     1$
         CMP     R3, #TYPENM     ; OBJ2 = ВРАГ?
-        BNE     CHKBNS1
+        BNE     2$
         MOV     #TYPENM, R0     ; РЕЗУЛЬТАТ: ВРАГ
         BR      COLTEX
 
-CHKPLR2:CMP     R3, #TYPPLR     ; OBJ2 = ИГРОК?
-        BNE     CHKBLT
+1$:     CMP     R3, #TYPPLR     ; OBJ2 = ИГРОК?
+        BNE     4$
         CMP     R2, #TYPENM     ; OBJ1 = ВРАГ?
-        BNE     CHKBLT
+        BNE     4$
         MOV     #TYPENM, R0     ; РЕЗУЛЬТАТ: ВРАГ
         BR      COLTEX
 
-CHKBNS1:CMP     R3, #TYPBNS     ; OBJ2 = БОНУС?
-        BNE     CHKWAL1
+2$:     CMP     R3, #TYPBNS     ; OBJ2 = БОНУС?
+        BNE     3$
         MOV     #TYPBNS, R0     ; РЕЗУЛЬТАТ: БОНУС
         BR      COLTEX
 
-CHKWAL1:CMP     R3, #TYPWAL     ; OBJ2 = СТЕНА?
-        BNE     CHKBLT
+3$:     CMP     R3, #TYPWAL     ; OBJ2 = СТЕНА?
+        BNE     4$
         MOV     #TYPWAL, R0     ; РЕЗУЛЬТАТ: ПРЕПЯТСТВИЕ
         BR      COLTEX
 
-CHKBLT: ; ПУЛЯ + ВРАГ = ПУЛЯ (УНИЧТОЖЕНИЕ)
+4$:     ; ПУЛЯ + ВРАГ = ПУЛЯ (УНИЧТОЖЕНИЕ)
         CMP     R2, #TYPBUL     ; OBJ1 = ПУЛЯ?
-        BNE     CHKBLT2
+        BNE     5$
         CMP     R3, #TYPENM     ; OBJ2 = ВРАГ?
-        BNE     CHKBLT3
+        BNE     6$
         MOV     #TYPBUL, R0     ; РЕЗУЛЬТАТ: ПУЛЯ
         BR      COLTEX
 
-CHKBLT2:CMP     R3, #TYPBUL     ; OBJ2 = ПУЛЯ?
+5$:     CMP     R3, #TYPBUL     ; OBJ2 = ПУЛЯ?
         BNE     OTHER
         CMP     R2, #TYPENM     ; OBJ1 = ВРАГ?
-        BNE     CHKBLT3
+        BNE     6$
         MOV     #TYPBUL, R0     ; РЕЗУЛЬТАТ: ПУЛЯ
         BR      COLTEX
 
-CHKBLT3:CMP     R2, #TYPBUL     ; OBJ1 = ПУЛЯ?
+6$:     CMP     R2, #TYPBUL     ; OBJ1 = ПУЛЯ?
         BNE     OTHER
         CMP     R3, #TYPWAL     ; OBJ2 = СТЕНА?
         BNE     OTHER
@@ -308,9 +308,9 @@ OTHER:  ; ДРУГИЕ КОМБИНАЦИИ
         MOV     #0, R0          ; НЕИЗВЕСТНАЯ КОМБИНАЦИЯ
         BR      COLTEX
 
-COLTNO: MOV     #0, R0          ; НЕТ КОЛЛИЗИИ
+10$:    MOV     #0, R0          ; НЕТ КОЛЛИЗИИ
 
-COLTEX: MOV     (SP)+, R4
+11$:    MOV     (SP)+, R4
         MOV     (SP)+, R3
         MOV     (SP)+, R2
         RETURN
