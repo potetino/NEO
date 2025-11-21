@@ -45,7 +45,7 @@ GAMELP:
         MOV     (SP)+, R0
 
         ; ПРОВЕРКА УСЛОВИЯ ВЫХОДА ИЗ ИГРЫ
-        TST     GAMEOVER
+        TST     GAMOVR
         BEQ     GAMELP
 
         BR GAMELP
@@ -327,7 +327,7 @@ HTHERO:
         BGT     1$
 
         ; ГЕРОЙ УМЕР
-        MOV     #1, GAMEOVER
+        MOV     #1, GAMOVR
         CALL    GAMEOVERSCREEN
 
 1$:
@@ -366,7 +366,7 @@ TAKBNS:
 
         ; ПРОВЕРЯЕМ ТИП БОНУСА
         MOV     BONUSTYPE(R0), R1
-        CMP     R1, #BONUS_HEALTH
+        CMP     R1, #BNSHLH
         BNE     1$
 
         ; БОНУС ЗДОРОВЬЯ
@@ -375,7 +375,7 @@ TAKBNS:
         BR      3$
 
 1$:
-        CMP     R1, #BONUS_POINTS
+        CMP     R1, #BNSPNS
         BNE     2$
 
         ; БОНУС ОЧКОВ
@@ -384,11 +384,11 @@ TAKBNS:
         BR      3$
 
 2$:
-        CMP     R1, #BONUS_WEAPON
+        CMP     R1, #BNSWPN
         BNE     3$
 
         ; УЛУЧШЕНИЕ ОРУЖИЯ
-        INC     WEAPONLEVEL
+        INC     WPNLVL
         CALL    WEAPONSOUND
 
 3$:
@@ -417,12 +417,12 @@ CHENMD:
 ; ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
 ;===================================================================
 
-GAMEOVER: .WORD 0
+GAMOVR:   .WORD 0
 HEROHP:   .WORD 3
 SCORE:    .WORD 0
-WEAPONLEVEL: .WORD 1
+WPNLVL:   .WORD 1
 
 ; КОНСТАНТЫ ТИПОВ БОНУСОВ
-BONUS_HEALTH = 1
-BONUS_POINTS = 2
-BONUS_WEAPON = 3
+BNSHLH = 1
+BNSPNS = 2
+BNSWPN = 3
