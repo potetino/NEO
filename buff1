@@ -1,0 +1,332 @@
+; =============================================
+; МОДУЛЬ ИНИЦИАЛИЗАЦИИ СИСТЕМЫ КОЛЛИЗИЙ
+; =============================================
+
+; ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+OBJCNT: .WORD   0               ; СЧЕТЧИК ОБъЕКТОВ
+OBJLST: .BLKW   21              ; СПИСОК АДРЕСОВ ОБъЕКТОВ
+
+; КОНСТАНТЫ ТИПОВ ОБ_ЕКТОВ
+        TYPPLR  = 0                  ; ИГРОК
+        TYPENM  = 1                  ; ВРАГ
+        TYPBUL  = 2                  ; ПУЛЯ
+        TYPBNS  = 3                  ; БОНУС
+        TYPWAL  = 4                  ; СТЕНА/ПРЕПЯТСТВИЕ
+        TYPTRP  = 5                  ; ЛОВУШКА
+        TYPPRT  = 6                  ; ПОРТАЛ
+        TYPDR   = 7                  ; ДВЕРЬ
+        TYPKEY  = 10                 ; КЛЮЧ
+        TYPEXP  = 11                 ; ВЗРЫВ
+
+; ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ КОЛЛИЗИЙ
+COLINT: MOV     R0, -(SP)        ; Сохраняем все используемые регистры
+        MOV     R1, -(SP)
+        MOV     R2, -(SP)
+        
+        ; ОЧИСТКА СЧЕТЧИКА И СПИСКА ОБ_ЕКТОВ
+        CLR     OBJCNT           ; Счетчик объектов = 0
+        
+        MOV     #OBJLST, R0      ; Адрес начала списка
+        MOV     #42, R1         ; 20 элементов в списке
+        
+CLRLOP: CLR     (R0)+            ; Очищаем элемент списка
+        SOB     R1, CLRLOP       ; Цикл очистки
+       
+1$:     ; ДОБАВЛЯЕМ ОБ_ЕКТЫ 
+        
+        ; Препятствия        
+        MOV     #PALM1, R0
+        CALL    ADDOBJ
+        
+        MOV     #PALM2, R0
+        CALL    ADDOBJ
+        
+        MOV     #PALM3, R0
+        CALL    ADDOBJ
+        
+        MOV     #PALM4, R0
+        CALL    ADDOBJ
+        
+
+        MOV     #WALL, R0
+        CALL    ADDOBJ
+        
+        MOV     #STONE, R0
+        CALL    ADDOBJ
+        
+        MOV     #CAR1, R0
+        CALL    ADDOBJ
+        
+        MOV     #CAR2, R0
+        CALL    ADDOBJ
+        
+        MOV     #ZABOR, R0
+        CALL    ADDOBJ
+        
+        MOV     #STOLB, R0
+        CALL    ADDOBJ
+        
+        MOV     #HOUSE1, R0
+        CALL    ADDOBJ
+        
+        MOV     #HOUSE2, R0
+        CALL    ADDOBJ
+        
+        MOV     #ACIRCL, R0
+        CALL    ADDOBJ
+        
+        ; Враги (добавляем позже, после отладки)
+         MOV     #ENEMY, R0
+         CALL    ADDOBJ
+         MOV     #ENY, R0
+         CALL    ADDOBJ
+         MOV     #ENBOO, R0
+         CALL    ADDOBJ
+         MOV     #ENFIRE, R0
+         CALL    ADDOBJ
+        
+
+2$:     MOV     (SP)+, R2        ; Восстанавливаем регистры
+        MOV     (SP)+, R1
+        MOV     (SP)+, R0
+        
+        RETURN
+
+; =============================================
+; БИБЛИОТЕКА КОЛЛИЗИЙ
+; =============================================
+
+; =============================================
+; БАЗОВАЯ ПРОВЕРКА КОЛЛИЗИИ ДВУХ ОБъЕКТОВ
+; ВХОД: R0=OBJ1, R1=OBJ2, ВЫХОД: R0=1(ДА)/0(НЕТ)
+; =============================================
+COLCHE: MOV     R2, -(SP)
+        MOV     R3, -(SP)
+        MOV     R4, -(SP)
+        MOV     R5, -(SP)
+        
+        ; ЗАГРУЗКА OBJ1
+        MOV     POSX(R0), R2
+        MOV     POSY(R0), R3
+        MOV     ADSPR(R0), R4
+        MOV     SIZEX(R4), R4
+        MOV     ADSPR(R0), R5
+        MOV     SIZEY(R5), R5
+
+        ; ГРАНИЦЫ OBJ1
+        ADD     R2, R4          ; X1+SIZEX1
+        ADD     R3, R5          ; Y1+SIZEY1
+        MOV     R2, -(SP)       ; X1
+        MOV     R3, -(SP)       ; Y1
+        MOV     R4, -(SP)       ; X1+SIZEX1
+        MOV     R5, -(SP)       ; Y1+SIZEY1
+
+        ; ЗАГРУЗКА OBJ2
+        MOV     POSX(R1), R2
+        MOV     POSY(R1), R3
+        MOV     ADSPR(R1), R4
+        MOV     SIZEX(R4), R4
+        MOV     ADSPR(R1), R5
+        MOV     SIZEY(R5), R5
+
+        ; ГРАНИЦЫ OBJ2
+        ADD     R2, R4          ; X2+SIZEX2
+        ADD     R3, R5          ; Y2+SIZEY2
+
+        ; ПРОВЕРКА AABB
+        CMP     4(SP), R2       ; X1+SIZEX1 < X2
+        BLT     NOCOL
+        CMP     R4, (SP)        ; X2+SIZEX2 < X1
+        BLT     NOCOL
+        CMP     6(SP), R3       ; Y1+SIZEY1 < Y2
+        BLT     NOCOL
+        CMP     R5, 2(SP)       ; Y2+SIZEY2 < Y1
+        BLT     NOCOL
+
+        MOV     #1, R0          ; КОЛЛИЗИЯ ЕСТЬ
+        BR      COLEX
+
+NOCOL:  MOV     #0, R0          ; НЕТ КОЛЛИЗИИ
+
+COLEX:  ADD     #10, SP         ; ЧИСТИМ СТЕК
+        MOV     (SP)+, R5
+        MOV     (SP)+, R4
+        MOV     (SP)+, R3
+        MOV     (SP)+, R2
+
+        RETURN
+
+; ======================================================
+; ДОБАВЛЕНИЕ ОБъЕКТА В СПИСОК
+; ВХОД: R0=АДРЕС ОБъЕКТА
+; ======================================================
+ADDOBJ: MOV     R1, -(SP)
+        MOV     OBJCNT, R1
+        CMP     R1, #42        ; МАКС 17 ОБъЕКТОВ
+        BGE     ADDOBX
+        ASL     R1
+        MOV     R0, OBJLST(R1)
+        INC     OBJCNT
+ADDOBX: MOV     (SP)+, R1
+        RETURN
+
+; УДАЛЕНИЕ ОБъЕКТА ИЗ СПИСКА
+; ВХОД: R0=АДРЕС ОБъЕКТА
+REMOBJ: MOV     R1, -(SP)
+        MOV     R2, -(SP)
+        MOV     R3, -(SP)
+        MOV     OBJCNT, R1
+        BEQ     REMOBX
+        MOV     #OBJLST, R2
+        CLR     R3
+REMLP:  CMP     R0, (R2)
+        BEQ     REMFND
+        ADD     #2, R2
+        INC     R3
+        CMP     R3, OBJCNT
+        BLT     REMLP
+        BR      REMOBX
+
+REMFND: MOV     R2, R0
+        MOV     OBJCNT, R1
+        SUB     R3, R1
+        DEC     R1
+        BEQ     REMDEC
+SHFTLP: MOV     2(R0), (R0)+
+        SOB     R1, SHFTLP
+REMDEC: DEC     OBJCNT
+REMOBX: MOV     (SP)+, R3
+        MOV     (SP)+, R2
+        MOV     (SP)+, R1
+
+        RETURN
+; =================================================
+; ПРОВЕРКА КОЛЛИЗИИ С ЛЮБЫМ ОБъЕКТОМ
+; ВХОД: R0=ОСНОВНОЙ ОБъЕКТ, ВЫХОД: R0=АДРЕС, R1=ТИП
+; =================================================
+COLANY: MOV     R2, -(SP)
+        MOV     R3, -(SP)
+        MOV     R4, -(SP)
+        MOV     OBJCNT, R4
+        BEQ     COLANN
+        MOV     #OBJLST, R3
+        MOV     R0, R2
+COLLP:  MOV     (R3)+, R1
+        CMP     R1, R2
+        BEQ     COLNXT
+        MOV     R2, R0
+        CALL    COLCHE
+        TST     R0
+        BEQ     COLNXT
+        MOV     R1, R0
+        MOV     TYPE(R1), R1
+        BR      COLAEX
+COLNXT: SOB     R4, COLLP
+COLANN: MOV     #0, R0
+        MOV     #0, R1
+COLAEX: MOV     (SP)+, R4
+        MOV     (SP)+, R3
+        MOV     (SP)+, R2
+        RTS     PC
+; =======================================
+; ПРОВЕРКА КОЛЛИЗИИ С ГРАНИЦАМИ ЭКРАНА
+; ВХОД: R0=ОБъЕКТ, ВЫХОД: R0=ФЛАГИ
+; ======================================
+COLENV: MOV     R1, -(SP)
+        MOV     R2, -(SP)
+        MOV     R3, -(SP)
+        CLR     R2
+        MOV     ADSPR(R0), R3
+        MOV     SIZEX(R3), R1
+        MOV     SIZEY(R3), R3
+        ; ЛЕВАЯ ГРАНИЦА
+        MOV     POSX(R0), R1
+        CMP     R1, #0.
+        BGT     CHKRIG
+        BIS     #1, R2
+CHKRIG: ; ПРАВАЯ ГРАНИЦА
+        MOV     POSX(R0), R1
+        ADD     SIZEX(R0), R1
+        CMP     R1, #61.
+        BLT     CHKTOP
+        BIS     #2, R2
+CHKTOP: ; ВЕРХНЯЯ ГРАНИЦА
+        MOV     POSY(R0), R1
+        CMP     R1, #10.
+        BGT     CHKBOT
+        BIS     #4, R2
+CHKBOT: ; НИЖНЯЯ ГРАНИЦА
+        MOV     POSY(R0), R1
+        ADD     SIZEY(R0), R1
+        CMP     R1, #230.
+        BLT     COLEXE
+        BIS     #10, R2
+COLEXE: MOV     R2, R0
+        MOV     (SP)+, R3
+        MOV     (SP)+, R2
+        MOV     (SP)+, R1
+        RTS     PC
+; ================================================
+; ОПРЕДЕЛЕНИЕ ТИПА ВЗАИМОДЕЙСТВИЯ
+; ВХОД: R0=OBJ1, R1=OBJ2, ВЫХОД: R0=ТИП КОЛЛИЗИИ
+; ================================================
+COLTYP: MOV     R2, -(SP)
+        MOV     R3, -(SP)
+        MOV     R4, -(SP)
+
+        CALL    COLCHE
+        TST     R0
+        BEQ     COLTNO
+        MOV     R0, R2
+        MOV     R1, R3
+        MOV     TYPE(R2), R2
+        MOV     TYPE(R3), R3
+        ; ИГРОК + ВРАГ
+        CMP     R2, #TYPPLR
+        BNE     CHKPL2
+        CMP     R3, #TYPENM
+        BNE     CHKBN1
+        MOV     #TYPENM, R0
+        BR      COLTEX
+CHKPL2: CMP     R3, #TYPPLR
+        BNE     CHKBLT
+        CMP     R2, #TYPENM
+        BNE     CHKBLT
+        MOV     #TYPENM, R0
+        BR      COLTEX
+CHKBN1: CMP     R3, #TYPBNS
+        BNE     CHKWA1
+        MOV     #TYPBNS, R0
+        BR      COLTEX
+CHKWA1: CMP     R3, #TYPWAL
+        BNE     CHKBLT
+        MOV     #TYPWAL, R0
+        BR      COLTEX
+CHKBLT: ; ПУЛЯ + ВРАГ
+        CMP     R2, #TYPBUL
+        BNE     CHKBL2
+        CMP     R3, #TYPENM
+        BNE     CHKBL3
+        MOV     #TYPBUL, R0
+        BR      COLTEX
+CHKBL2: CMP     R3, #TYPBUL
+        BNE     OTHER
+        CMP     R2, #TYPENM
+        BNE     CHKBL3
+        MOV     #TYPBUL, R0
+        BR      COLTEX
+CHKBL3: CMP     R2, #TYPBUL
+        BNE     OTHER
+        CMP     R3, #TYPWAL
+        BNE     OTHER
+        MOV     #TYPWAL, R0
+        BR      COLTEX
+OTHER:  MOV     #0, R0
+        BR      COLTEX
+COLTNO: MOV     #0, R0
+COLTEX: MOV     (SP)+, R4
+        MOV     (SP)+, R3
+        MOV     (SP)+, R2
+        RETURN
+
+        .end 
